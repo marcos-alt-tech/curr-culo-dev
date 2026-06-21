@@ -1,0 +1,154 @@
+import 'package:flutter/material.dart';
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple), useMaterial3: true),
+      routes: {
+        '/': (ctx) => const LoginTela(),
+        '/tarefas': (ctx) => const TarefasTela(),
+      },
+    );
+  }
+}
+
+class Tarefa {
+  String id = DateTime.now().toString();
+  String titulo;
+  bool concluida = false;
+  Tarefa(this.titulo);
+}
+
+// --- TELA DE LOGIN / CADASTRO ---
+class LoginTela extends StatelessWidget {
+  const LoginTela({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.deepPurple[50],
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Text("Bem Vindo, Mateus!", style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+              const Text("MEU RA: 5555555", style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 24),
+              Card(
+                color: Colors.deepPurple,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const TextField(decoration: InputDecoration(labelText: 'Email', filled: true, fillColor: Colors.white)),
+                      const SizedBox(height: 12),
+                      const TextField(obscureText: true, decoration: InputDecoration(labelText: 'Senha', filled: true, fillColor: Colors.white)),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pushReplacementNamed(context, '/tarefas'),
+                        child: const Text("Entrar"),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- TELA DE CALENDÁRIO E LISTA DE TAREFAS ---
+class TarefasTela extends StatefulWidget {
+  const TarefasTela({super.key});
+  @override
+  State<TarefasTela> createState() => _TarefasTelaState();
+}
+
+class _TarefasTelaState extends State<TarefasTela> {
+  DateTime _dataAtu = DateTime.now();
+  final Map<String, List<Tarefa>> _db = {};
+
+  String get _chave => "${_dataAtu.year}-${_dataAtu.month}-${_dataAtu.day}";
+
+  // Regra de Negócio: Pendentes primeiro, depois Concluídas. Ambas em Ordem Alfabética.
+  List<Tarefa> get _tarefasOrdenadas {
+    List<Tarefa> lista = _db[_chave] ?? [];
+    List<Tarefa> pnd = lista.where((t) => !t.concluida).toList();
+    List<Tarefa> cld = lista.where((t) => t.concluida).toList();
+    pnd.sort((a, b) => a.titulo.toLowerCase().compareTo(b.titulo.toLowerCase()));
+    cld.sort((a, b) => a.titulo.toLowerCase().compareTo(b.titulo.toLowerCase()));
+    return [...pnd, ...cld];
+  }
+
+  void _addTarefaDialog() {
+    final txtCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nova Tarefa'),
+        content: TextField(controller: txtCtrl, decoration: const InputDecoration(hintText: 'Nome da tarefa')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () {
+              if (txtCtrl.text.trim().isNotEmpty) {
+                setState(() => (_db[_chave] ??= []).add(Tarefa(txtCtrl.text.trim())));
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lista = _tarefasOrdenadas;
+    return Scaffold(
+      appBar: AppBar(title: const Text("Minhas Tarefas"), backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
+      body: Column(
+        children: [
+          CalendarDatePicker(
+            initialDate: _dataAtu,
+            firstDate: DateTime(2025),
+            lastDate: DateTime(2030),
+            onDateChanged: (d) => setState(() => _dataAtu = d),
+          ),
+          const Divider(),
+          Expanded(
+            child: lista.isEmpty
+                ? const Center(child: Text("Nenhuma tarefa para hoje."))
+                : ListView.builder(
+                    itemCount: lista.length,
+                    itemBuilder: (ctx, idx) {
+                      final t = lista[idx];
+                      return ListTile(
+                        leading: Checkbox(
+                          value: t.concluida,
+                          onChanged: (v) => setState(() => t.concluida = v ?? false),
+                        ),
+                        title: Text(t.titulo, style: TextStyle(decoration: t.concluida ? TextDecoration.lineThrough : null)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => setState(() => _db[_chave]?.removeWhere((item) => item.id == t.id)),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(onPressed: _addTarefaDialog, child: const Icon(Icons.add)),
+    );
+  }
+}
